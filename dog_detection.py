@@ -5,6 +5,8 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torchvision.models
+import numpy as np
+import cv2
 
 from tools.snippets import (quick_log_setup, mkdir)
 from tools.voc import (VOC_ocv, transforms_voc_ocv_eval,
@@ -84,14 +86,39 @@ def dog_detection():
     all_scored_centerdogs = {}
     for i_batch, (data, target, meta) in enumerate(tqdm(dataloader_test, "评估测试集")):
         imname = meta[0]['xml_parsed']['annotation']['filename']
-        if imname not in all_centerbox_dogs:
-            log.error(f"Missing key: {imname}")
-            continue  # 跳过缺失的键或抛出异常
         data = data.to(device)
-        pred = torch.sigmoid(model(data))  # 使用sigmoid激活函数
-        centerbox = all_centerbox_dogs[imname].copy()
-        centerbox[0, -1] = pred[0, 4]  # 将预测的狗得分赋值给中心框
-        all_scored_centerdogs[imname] = centerbox
+        
+        # 前向传播
+        pred = torch.sigmoid(model(data))
+        
+        # 反向传播计算梯度（针对狗类别，索引为4）
+        model.zero_grad()
+        pred[:,4].backward(retain_graph=True)
+        
+        # 生成热力图
+        weights = torch.mean(gradients["value"], dim=(2,3), keepdim=True)
+        cam = torch.sum(weights * activations["value"], dim=1, keepdim=True)
+        cam = torch.relu(cam)
+        cam = torch.nn.functional.interpolate(cam, size=data.shape[2:], mode="bilinear")
+        heatmap = cam.squeeze().cpu().numpy()
+        
+        # 归一化到0-1
+        heatmap = (heatmap - np.min(heatmap)) / (np.max(heatmap) - np.min(heatmap) + 1e-8)
+        
+        # 阈值化和轮廓检测（阈值设为0.5）
+        _, binary_map = cv2.threshold(heatmap, 0.5, 1, cv2.THRESH_BINARY)
+        contours, _ = cv2.findContours(binary_map.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # 生成边界框
+        boxes = []
+        for cnt in contours:
+            if cv2.contourArea(cnt) < 100:  # 过滤小轮廓
+                continue
+            x, y, w, h = cv2.boundingRect(cnt)
+            boxes.append([x, y, x+w, y+h, pred[0,4].item()])  # [xmin, ymin, xmax, ymax, 分数]
+        
+        # 保存结果
+        all_scored_centerdogs[imname] = np.array(boxes) if boxes else np.empty((0,5))
     stats_df = eval_stats_at_threshold(all_scored_centerdogs, all_gt_dogs)
     log.info('C. 得分中心框检测结果：\n{}'.format(stats_df))
 
