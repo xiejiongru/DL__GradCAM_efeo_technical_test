@@ -105,18 +105,28 @@ def dog_detection():
         # 归一化到0-1
         heatmap = (heatmap - np.min(heatmap)) / (np.max(heatmap) - np.min(heatmap) + 1e-8)
         
-        # 阈值化和轮廓检测（阈值设为0.5）
+        # 获取原图尺寸
+        orig_h = int(meta[0]['xml_parsed']['annotation']['size']['height'])
+        orig_w = int(meta[0]['xml_parsed']['annotation']['size']['width'])
+        scale_x = orig_w / data.shape[3]  # 输入宽度（如224）
+        scale_y = orig_h / data.shape[2]  # 输入高度（如224）
+
+        # 阈值化和轮廓检测
         _, binary_map = cv2.threshold(heatmap, 0.5, 1, cv2.THRESH_BINARY)
         contours, _ = cv2.findContours(binary_map.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        # 生成边界框
+
+        # 生成边界框并缩放坐标
         boxes = []
         for cnt in contours:
-            if cv2.contourArea(cnt) < 100:  # 过滤小轮廓
+            if cv2.contourArea(cnt) < 50:  # 降低面积过滤阈值
                 continue
             x, y, w, h = cv2.boundingRect(cnt)
-            boxes.append([x, y, x+w, y+h, pred[0,4].item()])  # [xmin, ymin, xmax, ymax, 分数]
-        
+            # 缩放坐标到原图尺寸
+            xmin = int(x * scale_x)
+            ymin = int(y * scale_y)
+            xmax = int((x + w) * scale_x)
+            ymax = int((y + h) * scale_y)
+            boxes.append([xmin, ymin, xmax, ymax, pred[0,4].item()])  # 添加分数        
         # 保存结果
         all_scored_centerdogs[imname] = np.array(boxes) if boxes else np.empty((0,5))
     stats_df = eval_stats_at_threshold(all_scored_centerdogs, all_gt_dogs)
