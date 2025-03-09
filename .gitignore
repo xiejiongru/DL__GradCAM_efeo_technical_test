@@ -1,0 +1,14 @@
+*.pyc
+*.swp
+*.cprof
+*.lprof
+*.mypy_cache
+*.pyc
+*.swp
+*.swo
+*.o
+*.so
+*.pth.tar
+__pycache__
+visualize/
+voc_dataset/

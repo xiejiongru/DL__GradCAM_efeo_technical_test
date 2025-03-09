@@ -1,0 +1,97 @@
+* Weakly-supervised learning task (Simplified)
+
+** Intro
+
+Machine learning models are rather opaque - it is often hard to
+tell why and how they make the decisions.
+Interpretable Machine Learning is an interesting research topic that
+aims to build tools decisions of which can be understood by humans.
+
+In this exercise we will focus on applying the GradCam technique
+[[https://arxiv.org/abs/1610.02391]].
+By using a GradCAM technique we can see the regions in the input
+images where activations have fired most often, thus contributing to
+the final prediction.
+
+** Using GradCAM for object detection
+
+I have finetuned a basic ResNet50 model on the VOC2007 training data -
+the model predicts whether the image belongs to one of the 20 VOC
+classes. I want to use the network that has been trained for
+classification to produce detections.
+
+For this you need to implement the GradCam technique and produce
+box-level predictions using the GradCam outputs. For this task I will
+only ask you to predict dogs and their locations on a subset of the VOC2007
+test set.
+
+Here is an example of the prediction that I get. The predicted box (dog_1) is
+not perfect, but is roughly in the proper location (GT_dog).
+
+[[./doc/dog_and_gradcam.jpg]]
+
+** What you have
+- I provide the code and the model in pytorch.
+  - ~train_voc_classifier.py~ and ~eval_voc_classifier.py~
+    respectively train and eval on VOC2007 classification task
+    - This model achieves ~83-85% mAP on VOC2007 test set.
+    - *Hint*: If your pytorch is rusty - you can use this code as a reference.
+  - If you don't have a pytorch supported GPU you will have to run the
+    model slowly in the CPU mode
+    - This would make the training via ~train_voc_classifier.py~ take ~1-2 hours, which is annoying.
+    - For this reason I provide a checkpoint with a trained model:
+      - [[https://sharedocs.huma-num.fr/wl/?id=zIfive7ZymGf6vRZJiskKBCFXiOURaeq]]
+      - (If the above one does not load):
+        - [[https://sharedocs.huma-num.fr/wl/?id=58zGDaRFcxczvZY6RK0K8TDnGKcIHOSw]]
+  - ~dog_detection.py~ has two simple baselines and the code
+    for evaluation of the detected boxes.
+  - *This is a simplified version of the exercise. I provide an additional
+    baseline C and some pointers, annotated with <HINT> in the code*
+- These are the baseline results that I get on the first 500 images in VOC2007 test set
+  - Metric is average precision, at different intersection thresholds
+  - A. CENTERBOX dogs (baseline that predicts a box in the center of every image)
+
+    |        |      0.3 |       0.4 |       0.5 |
+    |--------+----------+-----------+-----------|
+    | ap     | 3.868464 |  2.15691  |  0.283798 |
+    | recall | 54.00000 | 38.00000  | 16.000000 |
+  - B. CHEATING CENTERBOX dogs (baseline A, but cheat, look at the GT and
+    keep centerbox box only if there really is a dog there)
+    | 0.3    |       0.4 |      0.5  |          |
+    |--------+-----------+-----------+----------|
+    | ap     | 40.296106 | 22.182328 | 4.509091 |
+    | recall | 54.000000 | 38.000000 | 16.00000 |
+  - C. SCORED CENTERBOX dogs (baseline A, but predict dog score with the
+    trained model, and assign this score to the box)
+    | 0.3    |       0.4 |      0.5 |          |
+    |--------+-----------+----------+----------|
+    | ap     | 50.434485 | 27.06006 | 5.821429 |
+    | recall | 54.000000 | 38.00000 | 16.00000 |
+  - Just for reference: rough performance I got with a quick&dirty approach
+    |        |       0.3 |       0.4 |     0.5 |
+    |--------+-----------+-----------+---------|
+    | ap     | 48.805799 | 43.845483 | 21.4125 |
+    | recall | 58.000000 | 54.000000 | 34.0000 |
+- I've tested the code with python3.12 and 3.13 and provide a pip "Requirements
+  File" (~requirements_cpu_only.txt~) containing packages required to run the code on CPU.
+
+** What not to do
+- Please avoid submitting jupyter notebooks
+- Don't just ~from pytorch_grad_cam import GradCAM~
+  - I want to see your code for gradCAM
+  - If you are copypasting - make sure you understand how it works.
+- Obviously, don't use the ground truth labels in your solution.
+
+** What you have to do
+
+- You should read and understand the paper
+- Implement the dog detection approach via GradCam, get reasonable
+  performance (see the baselines above)
+  - You should write clean and readable code
+  - Show good scientific conduct
+- Prepare to answer the questions:
+  - How does GradCAM work, difference to CAM
+  - Your reasoning when implementing the detection approach
+  - Explain the metrics used, what is Recall, Average Precision (AP)
+    - <HINT>: This is important.
+  - How would you improve the method, if you had more time
