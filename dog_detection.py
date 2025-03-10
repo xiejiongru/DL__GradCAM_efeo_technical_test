@@ -5,6 +5,7 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torchvision.models
+from torchvision.ops import nms
 import numpy as np
 import cv2
 from pathlib import Path
@@ -91,6 +92,8 @@ def dog_detection():
         
         # 前向传播
         pred = torch.sigmoid(model(data))
+        # dog_score = pred[0,4].item()
+        # print(f"Image: {imname}, Dog score: {dog_score:.2f}")
         
         # 反向传播计算梯度（针对狗类别，索引为4）
         model.zero_grad()
@@ -152,6 +155,12 @@ def dog_detection():
             xmin, ymin, xmax, ymax = gt_box.astype(int)
             cv2.rectangle(overlay, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)  # GT框（绿色）
 
+        if len(boxes) > 0:
+            boxes_tensor = torch.tensor([box[:4] for box in boxes], dtype=torch.float32)
+            scores = torch.tensor([box[4] for box in boxes], dtype=torch.float32)
+            keep_indices = nms(boxes_tensor, scores, iou_threshold=0.5)
+            boxes = [boxes[i] for i in keep_indices]
+
         # 保存可视化结果
         vis_folder = mkdir('visualize/heatmap_boxes')  # 创建保存目录
         output_path = str(vis_folder / Path(impath).name)
@@ -163,7 +172,6 @@ def dog_detection():
     # 可视化结果
     fold = mkdir('visualize/scored_centerbox_dogs')
     visualize_dog_boxes(fold, all_scored_centerdogs, all_gt_dogs, metadata_test)
-
 
 if __name__ == "__main__":
     # Establish logging to STDOUT
