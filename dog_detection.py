@@ -7,6 +7,7 @@ import torch.nn as nn
 import torchvision.models
 import numpy as np
 import cv2
+from pathlib import Path
 
 from tools.snippets import (quick_log_setup, mkdir)
 from tools.voc import (VOC_ocv, transforms_voc_ocv_eval,
@@ -118,7 +119,7 @@ def dog_detection():
         # 生成边界框并缩放坐标
         boxes = []
         for cnt in contours:
-            if cv2.contourArea(cnt) < 50:  # 降低面积过滤阈值
+            if cv2.contourArea(cnt) < 30:  # 降低面积过滤阈值
                 continue
             x, y, w, h = cv2.boundingRect(cnt)
             # 缩放坐标到原图尺寸
@@ -129,6 +130,33 @@ def dog_detection():
             boxes.append([xmin, ymin, xmax, ymax, pred[0,4].item()])  # 添加分数        
         # 保存结果
         all_scored_centerdogs[imname] = np.array(boxes) if boxes else np.empty((0,5))
+
+         # 获取原图路径
+        impath = meta[0]['impath']
+        orig_img = cv2.imread(impath)
+        orig_img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB)  # 转换为RGB格式
+
+        # 生成热力图的彩色叠加
+        heatmap_color = cv2.applyColorMap(np.uint8(255 * heatmap), cv2.COLORMAP_JET)  # 使用JET颜色映射
+        heatmap_color = cv2.resize(heatmap_color, (orig_w, orig_h))  # 缩放到原图尺寸
+        overlay = cv2.addWeighted(orig_img, 0.5, heatmap_color, 0.5, 0)  # 叠加热力图和原图
+
+        # 绘制检测框（红色）和GT框（绿色）
+        for box in boxes:
+            xmin, ymin, xmax, ymax, _ = box
+            cv2.rectangle(overlay, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)  # 检测框（红色）
+
+        # 绘制GT框（绿色）
+        gt_boxes = all_gt_dogs.get(imname, [])
+        for gt_box in gt_boxes:
+            xmin, ymin, xmax, ymax = gt_box.astype(int)
+            cv2.rectangle(overlay, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)  # GT框（绿色）
+
+        # 保存可视化结果
+        vis_folder = mkdir('visualize/heatmap_boxes')  # 创建保存目录
+        output_path = str(vis_folder / Path(impath).name)
+        cv2.imwrite(output_path, cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))  # 保存为BGR格式
+
     stats_df = eval_stats_at_threshold(all_scored_centerdogs, all_gt_dogs)
     log.info('C. 得分中心框检测结果：\n{}'.format(stats_df))
 
