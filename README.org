@@ -134,7 +134,7 @@ Heatmap Generation:
 - Generate heatmaps through gradient weighting.
 
 Post-processing to generate detection boxes:
-- Threshold the heatmap (e.g., 0.5), extract contours, and filter out
+- Threshold the heatmap (e.g., 0.6), extract contours, and filter out
   small regions (e.g., <30 pixels).
 - Map the heatmap coordinates back to the original image size to
   generate detection boxes.
@@ -168,7 +168,7 @@ graph TD
 
     Q --> R[Heatmap Post-processing]
     R --> S[Normalize Heatmap to 0-1 Range]
-    S --> T["Threshold Processing (threshold=0.5)"]
+    S --> T["Threshold Processing (threshold=0.6)"]
     T --> U[Contour Detection findContours]
     U --> V[Generate Candidate Bounding Boxes]
     V --> W[Non-Maximum Suppression NMS]

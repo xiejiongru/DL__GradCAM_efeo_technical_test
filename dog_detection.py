@@ -91,8 +91,6 @@ def dog_detection():
         
         # Forward pass
         pred = torch.sigmoid(model(data))
-        # dog_score = pred[0,4].item()
-        # print(f"Image: {imname}, Dog score: {dog_score:.2f}")
         
         # Backward pass to compute gradients (for dog class, index 4)
         model.zero_grad()
@@ -115,7 +113,7 @@ def dog_detection():
         scale_y = orig_h / data.shape[2]  
 
         # Thresholding and contour detection
-        _, binary_map = cv2.threshold(heatmap, 0.5, 1, cv2.THRESH_BINARY)
+        _, binary_map = cv2.threshold(heatmap, 0.6, 1, cv2.THRESH_BINARY)  
         contours, _ = cv2.findContours(binary_map.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         # Generate bounding boxes and scale coordinates
@@ -124,50 +122,39 @@ def dog_detection():
             if cv2.contourArea(cnt) < 30:  
                 continue
             x, y, w, h = cv2.boundingRect(cnt)
-            # Scale coordinates to original image size
             xmin = int(x * scale_x)
             ymin = int(y * scale_y)
             xmax = int((x + w) * scale_x)
             ymax = int((y + h) * scale_y)
-            boxes.append([xmin, ymin, xmax, ymax, pred[0,4].item()])      
+            boxes.append([xmin, ymin, xmax, ymax, pred[0,4].item()])
         
-        all_scored_centerdogs[imname] = np.array(boxes) if boxes else np.empty((0,5))
-
-         # Get original image path
-        impath = meta[0]['impath']
-        orig_img = cv2.imread(impath)
-        orig_img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB)  
-
-        # Generate heatmap color overlay
-        heatmap_color = cv2.applyColorMap(np.uint8(255 * heatmap), cv2.COLORMAP_JET)
-        heatmap_color = cv2.resize(heatmap_color, (orig_w, orig_h))  
-        overlay = cv2.addWeighted(orig_img, 0.5, heatmap_color, 0.5, 0) 
-
-        # Draw detection boxes (red) and GT boxes (green)
-        for box in boxes:
-            xmin, ymin, xmax, ymax, _ = box
-            cv2.rectangle(overlay, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)
-        gt_boxes = all_gt_dogs.get(imname, [])
-        for gt_box in gt_boxes:
-            xmin, ymin, xmax, ymax = gt_box.astype(int)
-            cv2.rectangle(overlay, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
-
+        # Apply NMS
         if len(boxes) > 0:
             boxes_tensor = torch.tensor([box[:4] for box in boxes], dtype=torch.float32)
             scores = torch.tensor([box[4] for box in boxes], dtype=torch.float32)
             keep_indices = nms(boxes_tensor, scores, iou_threshold=0.5)
             boxes = [boxes[i] for i in keep_indices]
+        
+        all_scored_centerdogs[imname] = np.array(boxes) if boxes else np.empty((0,5))
 
-        vis_folder = mkdir('visualize/heatmap_boxes')  
+        # Visualize by drawing only detection boxes
+        impath = meta[0]['impath']
+        orig_img = cv2.imread(impath)
+        orig_img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB)
+        heatmap_color = cv2.applyColorMap(np.uint8(255 * heatmap), cv2.COLORMAP_JET)
+        heatmap_color = cv2.resize(heatmap_color, (orig_w, orig_h))
+        overlay = cv2.addWeighted(orig_img, 0.5, heatmap_color, 0.5, 0)
+        for box in boxes:
+            xmin, ymin, xmax, ymax, _ = box
+            cv2.rectangle(overlay, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)
+        vis_folder = mkdir('visualize/heatmap_boxes')
         output_path = str(vis_folder / Path(impath).name)
-        cv2.imwrite(output_path, cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))  
+        cv2.imwrite(output_path, cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
 
+    # Final evaluation using ground truth labels
     stats_df = eval_stats_at_threshold(all_scored_centerdogs, all_gt_dogs)
-    log.info('C. Scored center box detection results:\n{}'.format(stats_df))
-    fold = mkdir('visualize/scored_centerbox_dogs')
-    visualize_dog_boxes(fold, all_scored_centerdogs, all_gt_dogs, metadata_test)
+    log.info('C. Scored centerbox detection results:\n{}'.format(stats_df))
 
 if __name__ == "__main__":
-    # Establish logging to STDOUT
     log = quick_log_setup(logging.INFO)
     dog_detection()
