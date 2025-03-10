@@ -7,8 +7,8 @@ import cv2
 
 def mkdir(directory) -> Path:
     """
-    Python 3.5 pathlib快捷方式，相当于mkdir -p
-    如果父目录被其他进程在调用过程中创建则会失败
+    Python 3.5 pathlib shortcut to mkdir -p
+    Fails if parent is created by other process in the middle of the call
     """
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -17,7 +17,7 @@ def mkdir(directory) -> Path:
 
 class Averager(object):
     """
-    平均值计算器
+    Taken from kensh code. Also seen in Gunnar's code
     """
     def __init__(self):
         self.reset()
@@ -43,7 +43,7 @@ def visualize_bbox(
         BOX_COLOR=(255, 0, 0),
         TEXT_COLOR=(255, 255, 255),
         thickness=2):
-    """在图像上可视化单个边界框"""
+    """Visualizes a single bounding box on the image"""
     x_min, y_min, x_max, y_max = map(int, bbox)
 
     cv2.rectangle(img, (x_min, y_min), (x_max, y_max),
@@ -67,7 +67,6 @@ def visualize_bbox(
 
 
 def quick_log_setup(level):
-    # 快速设置日志记录
     logger = logging.getLogger()
     handler = logging.StreamHandler()
     formatter = logging.Formatter(
@@ -81,7 +80,7 @@ def quick_log_setup(level):
 
 
 def compute_or_load_pkl_silently(filepath, function, *args, **kwargs):
-    """静默计算或加载pickle文件"""
+    """Implementation without outputs"""
     try:
         with Path(filepath).open('rb') as f:
             pkl = pickle.load(f)
@@ -93,7 +92,6 @@ def compute_or_load_pkl_silently(filepath, function, *args, **kwargs):
 
 
 def stash2(stash_to):
-    # 缓存装饰器
     def stash_func(function, *args, **kwargs):
         return compute_or_load_pkl_silently(stash_to, function, *args, **kwargs)
     return stash_func

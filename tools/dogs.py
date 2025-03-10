@@ -11,34 +11,34 @@ log = logging.getLogger(__name__)
 
 
 def voc_ap(rec, prec, use_07_metric=False):
-    """计算给定精确率和召回率的VOC AP（平均精度）。
-    如果use_07_metric为True，则使用VOC 2007的11点方法（默认：False）。
+    """Compute VOC AP given precision and recall. If use_07_metric is true, uses
+    the VOC 07 11-point method (default:False).
     """
     if use_07_metric:
-        # VOC 2007 11点插值法
+        # VOC 2007 11-point interpolation method
         ap = 0.0
-        for t in np.arange(0.0, 1.1, 0.1):  # 遍历[0.0, 1.0]范围内的11个阈值
-            if np.sum(rec >= t) == 0:  # 如果没有满足条件的召回率
+        for t in np.arange(0.0, 1.1, 0.1):  # Iterate over 11 threshold values from 0.0 to 1.0
+            if np.sum(rec >= t) == 0:  # If no recall values meet the threshold
                 p = 0
             else:
-                p = np.max(prec[rec >= t])  # 取当前阈值下的最大精确率
-            ap = ap + p / 11.0  # 累加AP
+                p = np.max(prec[rec >= t])  # Take the maximum precision at or above the threshold
+            ap = ap + p / 11.0  # Accumulate AP
     else:
-        # VOC 2010+ 平滑曲线法
-        mrec = np.concatenate(([0.0], rec, [1.0]))  # 添加哨兵值
+        # VOC 2010+ area under the curve method
+        mrec = np.concatenate(([0.0], rec, [1.0]))  # Add sentinel values
         mpre = np.concatenate(([0.0], prec, [0.0]))
-        # 计算精度包络线
+        # Compute the precision envelope
         for i in range(mpre.size - 1, 0, -1):
             mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
-        # 找到召回率变化的点
+        # Identify recall level changes
         i = np.where(mrec[1:] != mrec[:-1])[0]
-        # 计算PR曲线下的面积
+        # Compute the area under the precision-recall curve
         ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
     return ap
 
 
 def prec_rec_prepare(all_detected_dogs, all_gt_dogs):
-    # 读取GT对象
+    # Read GT objects
     class_recs = {}
     npos = 0
     for imname, bbox in all_gt_dogs.items():
@@ -70,7 +70,7 @@ def prec_rec_prepare(all_detected_dogs, all_gt_dogs):
 
 
 def prec_rec_compute(image_ids, class_recs, BB, npos, ovthresh):
-    # 遍历检测结果并标记TP和FP
+    # Iterate over detections and mark TPs and FPs
     nd = len(image_ids)
     tp = np.zeros(nd)
     fp = np.zeros(nd)
@@ -124,7 +124,7 @@ def prec_rec_compute(image_ids, class_recs, BB, npos, ovthresh):
 
 def compute_ap_and_recall(all_detected_dogs, all_gt_dogs, ovthresh):
     """
-    计算VOC检测指标。该代码改编自detectron2仓库
+    Compute VOC detection metrics. This code is adapted from the detectron2 repository
     """
     image_ids, class_recs, BB, npos = prec_rec_prepare(
             all_detected_dogs, all_gt_dogs)
@@ -135,24 +135,24 @@ def compute_ap_and_recall(all_detected_dogs, all_gt_dogs, ovthresh):
 
 def eval_stats_at_threshold(all_detected_dogs, all_gt_dogs, thresholds=[0.3, 0.4, 0.5]):
     """
-    在不同的交并比（IoU）阈值下评估平均精度（AP）和召回率。
-    参数：
-      - all_detected_dogs: 检测到的狗框
-      - all_gt_dogs: 真实标注的狗框
-      - thresholds: IoU阈值列表
-    返回：包含AP和召回率的DataFrame
+    Evaluate average precision (AP) and recall at different intersection-over-union (IoU) thresholds.
+    Parameters:
+      - all_detected_dogs: Detected dog bounding boxes
+      - all_gt_dogs: Ground truth dog bounding boxes
+      - thresholds: List of IoU thresholds
+    Returns: DataFrame containing AP and recall
     """
     stats = {}
-    for ovthresh in thresholds:  # 遍历每个IoU阈值
+    for ovthresh in thresholds:  # Iterate over each IoU threshold
         ap, recall = compute_ap_and_recall(all_detected_dogs, all_gt_dogs, ovthresh)
-        stats[ovthresh] = {'ap': ap, 'recall': recall}  # 存储AP和召回率
-    stats_df = pd.DataFrame.from_records(stats) * 100  # 转换为百分比形式
+        stats[ovthresh] = {'ap': ap, 'recall': recall}  # Store AP and recall
+    stats_df = pd.DataFrame.from_records(stats) * 100  # Convert to percentage form
     return stats_df
 
 
 def read_metadata(dataset):
     """
-    从torch数据集中读取VOC2007元数据，避免通过dataloader循环
+    Read VOC2007 metadata from a torch dataset to avoid looping through dataloader
     """
     metadata = {}
     for anno_id, anno in enumerate(dataset.annotations):
@@ -171,8 +171,8 @@ def read_metadata(dataset):
 
 def produce_gt_dog_boxes(metadata):
     """
-    生成真实标注的狗框
-    返回：Dict[image_name, [N_boxes, 4] np.array的框坐标]
+    Generate ground truth dog bounding boxes
+    Returns: Dict[image_name, [N_boxes, 4] np.array of bounding box coordinates]
     """
     all_gt_dogs = {}
     for imname, metaitem in metadata.items():
@@ -192,8 +192,8 @@ def produce_gt_dog_boxes(metadata):
 
 def produce_fake_centered_dog_boxes(metadata, scale, cheating=True):
     """
-    生成带有分数=1.0的假狗框
-    返回：Dict[image_name, [N_boxes, 5] np.array的框坐标+分数]
+    Generate fake dog bounding boxes with score=1.0
+    Returns: Dict[image_name, [N_boxes, 5] np.array of bounding box coordinates + score]
     """
     all_detected_dogs = {}
     for imname, metaitem in metadata.items():
@@ -209,7 +209,7 @@ def produce_fake_centered_dog_boxes(metadata, scale, cheating=True):
 
 
 def visualize_dog_boxes(folder, all_detected_dogs, all_gt_dogs, metadata):
-    # 可视化预测和真实标注
+    # Visualize predictions and ground truth
     for imname, gt_dogs in all_gt_dogs.items():
         metaitem = metadata[imname]
         impath = metaitem['impath']

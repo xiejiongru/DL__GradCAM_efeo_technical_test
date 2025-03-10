@@ -24,7 +24,6 @@ log = logging.getLogger(__name__)
 
 
 def enforce_all_seeds(seed):
-    # 强制设置所有随机种子以确保可重复性
     np.random.seed(seed)
     random.seed(seed)
     torch.manual_seed(seed)
@@ -55,7 +54,6 @@ def construct_optimizer(model,
         optimizing_method='adamw',
         base_lr=0.00005, momentum=0.9, dampening=0.0,
         nesterov=False, weight_decay=0):
-    # 构建优化器，BN参数不应使用权重衰减
     # slowfast/models/optimizer.py
     # BN params should not get weight decayed
     bn_params = []
@@ -93,7 +91,6 @@ def construct_optimizer(model,
 
 
 class Manager_checkpoint_name(object):
-    # 管理检查点名称
     ckpt_re = r'model_at_epoch_(?P<i_epoch>\d*).pth.tar'
     ckpt_format = 'model_at_epoch_{:03d}.pth.tar'
 
@@ -123,7 +120,6 @@ class Manager_checkpoint_name(object):
 
 
 class Checkpointer(object):
-    # 检查点管理类
     def __init__(self, model, optimizer):
         self.model = model
         self.optimizer = optimizer
@@ -168,7 +164,6 @@ class Checkpointer(object):
 
 
 def qacc_sigmoid(output, Y):
-    # 计算sigmoid输出的准确率
     pred = (torch.sigmoid(output) > 0.5)
     return pred.eq(Y).sum().item()/len(Y)
 
@@ -176,7 +171,8 @@ def qacc_sigmoid(output, Y):
 def lr_func_steps_with_relative_lrs(
         solver_steps, MAX_EPOCH, solver_lrs, base_lr, cur_epoch):
     """
-    根据指定的学习率步骤和当前epoch检索学习率
+    Retrieve the learning rate to specified values at specified epoch with the
+    steps with relative learning rate schedule.
     """
     steps = solver_steps + [MAX_EPOCH]
     for ind, step in enumerate(steps):  # NoQA
@@ -187,7 +183,6 @@ def lr_func_steps_with_relative_lrs(
 
 
 def set_lr(optimizer, new_lr):
-    # 设置优化器的学习率
     for param_group in optimizer.param_groups:
         param_group["lr"] = new_lr
 
@@ -225,7 +220,6 @@ atransform_eval = A.Compose([
 
 
 def create_multilabel_target(target):
-    # 创建多标签目标向量
     target_vector = np.zeros(len(VOC_CLASSES))
     objects = target['annotation']['object']
     for obj in objects:
@@ -236,14 +230,12 @@ def create_multilabel_target(target):
 
 
 def transforms_voc_ocv_train(image, target):
-    # 训练时的转换
     im_torch = atransform_train(image=image)['image']
     target_vector_t = create_multilabel_target(target)
     return im_torch, target_vector_t
 
 
 def transforms_voc_ocv_eval(image, target):
-    # 评估时的转换
     im_torch = atransform_eval(image=image)['image']
     target_vector_t = create_multilabel_target(target)
     return im_torch, target_vector_t
@@ -251,7 +243,6 @@ def transforms_voc_ocv_eval(image, target):
 
 # Subclassing torchvision dataset to load images with our transforms
 class VOC_ocv(torchvision.datasets.VOCDetection):
-    # VOC数据集类
     def __init__(
             self, root, year, image_set, download, transforms,
             n_retries=3, pass_image=False):
